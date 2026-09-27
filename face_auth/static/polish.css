@@ -1,0 +1,6 @@
+/* Shared visual polish for employee access pages. */
+body{font-family:Arial,sans-serif;overflow-x:hidden}
+body::before,body::after{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;background-image:radial-gradient(circle,rgba(159,211,154,.46) 0 1px,transparent 1.7px),radial-gradient(circle,rgba(127,184,217,.28) 0 1px,transparent 1.8px);background-size:108px 108px,181px 181px;background-position:14px 18px,72px 92px;animation:auth-particles 22s linear infinite}
+@keyframes auth-particles{to{background-position:122px 126px,253px 273px}}
+.shell,.location-shell{position:relative;z-index:1}.brand,h1{font-family:"Helvetica Neue",Helvetica,Arial,sans-serif}.card{border:1px solid rgba(255,255,255,.12);background:rgba(241,243,237,.98)}button{font-family:Arial,sans-serif;transition:transform .16s ease,filter .16s ease}button:hover{transform:translateY(-1px);filter:brightness(1.05)}
+@media(prefers-reduced-motion:reduce){body::before,body::after{animation:none}button{transition:none}}

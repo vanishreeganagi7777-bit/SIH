@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ecora · Report Status</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div id="app"></div>
+
+<script src="assets/app.js"></script>
+<script>
+async function init() {
+  mountShell("report-status.html", `
+    <div class="topbar">
+      <div>
+        <div class="page-title">Report Status</div>
+        <div class="page-sub">Pending, approved, and rejected field reports</div>
+      </div>
+    </div>
+
+    <div class="status-summary" id="status-summary">Loading report summary…</div>
+
+    <div class="card table-card">
+      <div class="table-header">
+        <h3>Recent Reports</h3>
+      </div>
+      <div id="report-status-table" class="report-status-table"></div>
+    </div>
+  `);
+
+  try {
+    const d = await apiGet("/api/reports");
+    const reports = Array.isArray(d.reports) ? d.reports : [];
+    const statusCounts = { Submitted: 0, Pending: 0, Approved: 0, Rejected: 0 };
+
+    for (const report of reports) {
+      const status = report.status || "Submitted";
+      statusCounts[status] = (statusCounts[status] || 0) + 1;
+    }
+
+    const summaryCards = [
+      { label: "Total", value: reports.length, tone: "info" },
+      { label: "Submitted", value: statusCounts.Submitted || 0, tone: "submitted" },
+      { label: "Pending", value: statusCounts.Pending || 0, tone: "pending" },
+      { label: "Approved", value: statusCounts.Approved || 0, tone: "approved" },
+      { label: "Rejected", value: statusCounts.Rejected || 0, tone: "rejected" },
+    ];
+
+    document.getElementById("status-summary").innerHTML = summaryCards.map(card => `
+      <div class="status-card ${card.tone}">
+        <div class="status-card-label">${card.label}</div>
+        <div class="status-card-value">${card.value}</div>
+      </div>
+    `).join("");
+
+    if (!reports.length) {
+      document.getElementById("report-status-table").innerHTML = `
+        <div class="empty-state">No reports have been submitted yet.</div>
+      `;
+      return;
+    }
+
+    const rows = reports.map(report => {
+      const status = report.status || "Submitted";
+      const statusClass = status.toLowerCase() === "approved" ? "approved" :
+        status.toLowerCase() === "pending" ? "pending" :
+        status.toLowerCase() === "rejected" ? "rejected" : "submitted";
+
+      return `
+        <div class="status-row">
+          <div class="status-cell title-cell" data-label="Report">
+            <div class="report-title">${report.title}</div>
+            <div class="report-meta">${report.description}</div>
+          </div>
+          <div class="status-cell" data-label="Status">
+            <select class="status-select ${statusClass}" data-id="${report.id}" aria-label="Change report status for ${report.title}">
+              <option value="Submitted" ${status === "Submitted" ? "selected" : ""}>Submitted</option>
+              <option value="Pending" ${status === "Pending" ? "selected" : ""}>Pending</option>
+              <option value="Approved" ${status === "Approved" ? "selected" : ""}>Approved</option>
+              <option value="Rejected" ${status === "Rejected" ? "selected" : ""}>Rejected</option>
+            </select>
+          </div>
+          <div class="status-cell" data-label="Submitted">
+            <div class="report-meta">${new Date(report.created_at).toLocaleString()}</div>
+          </div>
+          <div class="status-cell" data-label="Location">
+            <div class="report-meta">${report.lat}, ${report.lng}</div>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    document.getElementById("report-status-table").innerHTML = `
+      <div class="status-row header-row">
+        <div class="status-cell title-cell"><strong>Report</strong></div>
+        <div class="status-cell"><strong>Status</strong></div>
+        <div class="status-cell"><strong>Submitted</strong></div>
+        <div class="status-cell"><strong>Location</strong></div>
+      </div>
+      ${rows}
+    `;
+
+    document.querySelectorAll(".status-select").forEach((select) => {
+      select.addEventListener("change", async (event) => {
+        const reportId = event.target.dataset.id;
+        const nextStatus = event.target.value;
+        try {
+          const res = await fetch(`${API_BASE}/api/reports/${reportId}/status`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: nextStatus })
+          });
+          if (!res.ok) throw new Error(await res.text());
+          init();
+        } catch (err) {
+          console.error(err);
+          alert("Could not update report status.");
+        }
+      });
+    });
+  } catch (error) {
+    document.getElementById("status-summary").innerHTML = `
+      <div class="status-card info">
+        <div class="status-card-label">API</div>
+        <div class="status-card-value">Offline</div>
+      </div>
+    `;
+    document.getElementById("report-status-table").innerHTML = `
+      <div class="empty-state">Backend not reachable — start the FastAPI server (see README).</div>
+    `;
+    console.error(error);
+  }
+}
+
+init();
+</script>
+</body>
+</html>

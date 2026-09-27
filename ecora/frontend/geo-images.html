@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ecora · Geo Tagged Images</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div id="app"></div>
+
+<script src="assets/app.js"></script>
+<script>
+// tile size classes cycled to get the irregular grid look from the wireframe
+const TILE_SHAPES = ["tall", "", "", "wide"];
+const GEO_IMAGE_FILES = ["pune-field.jpeg", "nashik-park.jpeg", "water-garden.jpeg"];
+
+async function init() {
+  mountShell("geo-images.html", `
+    <div class="topbar">
+      <div>
+        <div class="page-title">Geo Tagged Images</div>
+        <div class="page-sub">Images officials attached while filing field complaints</div>
+      </div>
+    </div>
+    <div class="geo-gallery" id="gallery">Loading…</div>
+  `);
+
+  try {
+    const d = await apiGet("/api/geo-images");
+    const gallery = document.getElementById("gallery");
+    gallery.innerHTML = d.images.map((img, i) => {
+      // The fallback keeps the gallery compatible with a backend that has not
+      // yet reloaded the newer image_name field.
+      const imageFile = img.image_name || GEO_IMAGE_FILES[i % GEO_IMAGE_FILES.length];
+      return `
+      <div class="geo-tile ${TILE_SHAPES[i % TILE_SHAPES.length]}">
+        <img class="tile-fill" src="assets/geo-images/${imageFile}" alt="${img.title}">
+        <div class="tile-caption">
+          <b>${img.title}</b><br>
+          ${img.officer}<br>
+          📍 ${img.location_label} · <span class="badge ${img.status === 'Resolved' ? 'normal' : img.status === 'Escalated' ? 'flood' : 'drought'}">${img.status}</span>
+        </div>
+      </div>
+    `;
+    }).join("");
+  } catch (e) {
+    document.getElementById("gallery").textContent =
+      "Backend not reachable — start the FastAPI server (see README).";
+    console.error(e);
+  }
+}
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,3 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Employee dashboard</title><link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/polish.css"></head>
+<body><main class="shell"><a class="brand" href="/">ECORA / EMPLOYEE ACCESS</a><section class="card success"><p class="eyebrow">Authentication confirmed</p><h1>Login successful.</h1><p class="intro">Welcome, {{ employee['full_name'] }}.</p><dl><dt>Official ID</dt><dd>{{ employee['official_id'] }}</dd><dt>Designation</dt><dd>{{ employee['designation'] }}</dd></dl><form action="/logout" method="post"><button class="secondary">Sign out</button></form></section></main></body></html>

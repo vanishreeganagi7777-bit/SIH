@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Select location · Ecora</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <link rel="stylesheet" href="/static/polish.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&family=Poppins:wght@400;500;600;700&display=swap');
+    .location-shell{width:min(100% - 32px,760px);margin:0 auto;padding:38px 0 56px;font-family:Poppins,sans-serif}.location-shell .brand{font-family:"Helvetica Neue",Helvetica,Arial,sans-serif}.location-card{background:rgba(27,31,28,.96);color:#eef2ec;padding:clamp(24px,5vw,40px);border:1px solid rgba(255,255,255,.12);border-radius:24px;box-shadow:0 20px 70px #08120d66}.location-card h1{font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;font-size:clamp(28px,5vw,42px);letter-spacing:.02em}.location-card .intro{color:#c6cec2}.location-eyebrow{margin:0 0 10px;color:#9fd39a;font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}.location-switch{display:flex;gap:8px;margin:26px 0 18px}.location-switch button{flex:1;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#c6cec2}.location-switch button.active{background:#7fc47a;color:#122015}.location-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.location-choice{position:relative;display:block;cursor:pointer}.location-choice input{position:absolute;opacity:0;pointer-events:none}.location-choice span{display:block;padding:16px;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(255,255,255,.05);color:#c6cec2;font-weight:600;transition:.15s}.location-choice small{display:block;margin-top:3px;color:#8b968a;font-size:11px;font-weight:400}.location-choice input:checked + span{border-color:#9fd39a;background:rgba(159,211,154,.18);color:#eef2ec;box-shadow:0 0 0 1px #9fd39a}.location-actions{display:flex;justify-content:flex-end;margin-top:24px}.location-actions button{background:#7fc47a;color:#122015;font-family:Poppins,sans-serif}.location-actions button:disabled{opacity:.45}.location-note{min-height:20px;margin:14px 0 0;color:#e3c778;font-size:12px}@media(max-width:520px){.location-list{grid-template-columns:1fr}.location-switch{flex-direction:column}}
+  </style>
+</head>
+<body>
+  <main class="location-shell">
+    <a class="brand" href="/">ECORA / EMPLOYEE ACCESS</a>
+    <section class="location-card">
+      <p class="location-eyebrow">Registration complete</p>
+      <h1>Select your service area</h1>
+      <p class="intro">Choose the village or city you will use for the dashboard. These are demo locations for now.</p>
+      <div class="location-switch" role="tablist" aria-label="Location type">
+        <button type="button" class="active" data-type="village">Villages</button>
+        <button type="button" data-type="city">Cities</button>
+      </div>
+      <form id="locationForm">
+        <div class="location-list" id="locationList"></div>
+        <p class="location-note" id="locationNote" role="status"></p>
+        <div class="location-actions"><button type="submit">Continue to dashboard</button></div>
+      </form>
+    </section>
+  </main>
+  <script>
+    const locations = {
+      village: [
+        ["Hosahalli", "Bengaluru Rural, Karnataka"], ["Doddakere", "Bengaluru Rural, Karnataka"],
+        ["Kothanur", "Mysuru, Karnataka"], ["Kumbharwadi", "Pune, Maharashtra"]
+      ],
+      city: [
+        ["Bengaluru", "Karnataka"], ["Mysuru", "Karnataka"],
+        ["Pune", "Maharashtra"], ["Nashik", "Maharashtra"]
+      ]
+    };
+    let activeType = "village";
+    const list = document.getElementById("locationList");
+    const note = document.getElementById("locationNote");
+    function renderChoices() {
+      list.innerHTML = locations[activeType].map(([name, detail], index) => `<label class="location-choice"><input type="radio" name="location" value="${name}" ${index === 0 ? "checked" : ""}><span>${name}<small>${detail}</small></span></label>`).join("");
+    }
+    document.querySelectorAll("[data-type]").forEach(button => button.addEventListener("click", () => {
+      activeType = button.dataset.type;
+      document.querySelectorAll("[data-type]").forEach(item => item.classList.toggle("active", item === button));
+      renderChoices(); note.textContent = "";
+    }));
+    document.getElementById("locationForm").addEventListener("submit", event => {
+      event.preventDefault();
+      const choice = new FormData(event.currentTarget).get("location");
+      if (!choice) { note.textContent = "Select a village or city to continue."; return; }
+      localStorage.setItem("ecoraSelectedLocation", JSON.stringify({ name: choice, type: activeType }));
+      window.location.assign("/dashboard/");
+    });
+    renderChoices();
+  </script>
+</body>
+</html>

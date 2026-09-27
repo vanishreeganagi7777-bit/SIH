@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ecora · Map Explorer</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" integrity="sha512-h9FcoyWjHcOcmEVkxOfTLnmZFWIH0iZhZT1H2TbOq55xssQGEJHEaIm+PgoUaZbRvQTNTluNOEfb1ZRy6D3BOw==" crossorigin="anonymous" referrerpolicy="no-referrer">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+</head>
+<body>
+<div id="app"></div>
+
+<script src="assets/app.js"></script>
+<script>
+async function init() {
+  mountShell("index.html", `
+    <div class="topbar">
+      <div>
+        <div class="page-title">Map Explorer</div>
+        <div class="page-sub" id="village-sub">Loading village data…</div>
+      </div>
+      <button class="pill-btn accent" onclick="init()">↻ Refresh</button>
+    </div>
+
+    <div class="map-page-layout">
+      <div class="card map-box-lg">
+        <h3>Village Land Map</h3>
+        <div class="map-wrap" style="min-height:480px;">
+          <div id="map-explorer-map" class="leaflet-map" aria-label="Interactive map showing your current location"></div>
+          <div class="map-location-status" id="map-location-status">Requesting your location…</div>
+        </div>
+      </div>
+
+      <div class="side-stack">
+        <div class="card">
+          <h3>Agriculture vs Non-Agriculture (acres)</h3>
+          <div class="chart-box" style="height:150px;"><canvas id="landBarChart"></canvas></div>
+          <div class="chart-values" aria-label="Land acreage values">
+            <span>Agriculture <b id="agriculture-acres">780 ac</b></span>
+            <span>Non-agriculture <b id="non-agriculture-acres">460 ac</b></span>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Water Flow Across Land</h3>
+          <div class="stat-row">
+            <div class="stat-chip">
+              <div class="label">Flowing</div>
+              <div class="num" id="water-flow-acres">—</div>
+            </div>
+            <div class="stat-chip">
+              <div class="label">No Flow</div>
+              <div class="num" id="water-noflow-acres">—</div>
+            </div>
+          </div>
+          <div class="hint" style="margin-top:10px;">Excess flow (more than needed): <b id="water-excess-acres" style="color:var(--danger);">—</b></div>
+        </div>
+
+        <div class="card">
+          <h3>Land Classification</h3>
+          <div class="value" id="class-level" style="font-size:20px;">—</div>
+          <div class="hint" id="class-reason" style="margin-top:6px;">—</div>
+          <div class="hint" style="margin-top:12px;line-height:1.7;">
+            <span class="badge high">High</span> agri ≥60% · <span class="badge moderate">Moderate</span> mixed ·
+            <span class="badge low">Low</span> rain &lt;600mm
+          </div>
+        </div>
+      </div>
+    </div>
+  `);
+
+  try {
+    const d = await apiGet("/api/land-overview");
+    document.getElementById("village-sub").textContent =
+      `${d.village} · ${d.total_acres} acres surveyed`;
+
+    document.getElementById("class-reason").textContent =
+      `${d.total_acres} ac total · ${d.classification.annual_rainfall_mm}mm/yr rainfall`;
+
+    const levelEl = document.getElementById("class-level");
+    levelEl.innerHTML = `<span class="badge ${d.classification.level.toLowerCase()}">${d.classification.level} Level Land</span>`;
+
+    document.getElementById("water-flow-acres").textContent = `${d.water_flow.flowing_acres} ac`;
+    document.getElementById("water-noflow-acres").textContent = `${d.water_flow.not_flowing_acres} ac`;
+    document.getElementById("water-excess-acres").textContent = `${d.water_flow.excess_flow_acres} ac`;
+    document.getElementById("agriculture-acres").textContent = `${d.land_split.agriculture_acres} ac`;
+    document.getElementById("non-agriculture-acres").textContent = `${d.land_split.non_agriculture_acres} ac`;
+
+    new Chart(document.getElementById("landBarChart"), {
+      type: "bar",
+      data: {
+        labels: ["Agriculture", "Non-Agri"],
+        datasets: [{
+          data: [d.land_split.agriculture_acres, d.land_split.non_agriculture_acres],
+          backgroundColor: ["rgba(143,208,160,0.8)", "rgba(159,150,120,0.8)"],
+          borderRadius: 8,
+          maxBarThickness: 50,
+        }]
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: "#c6cec2", font:{size:11} }, grid: { display: false } },
+          y: { ticks: { color: "#c6cec2", font:{size:10} }, grid: { color: "rgba(255,255,255,0.06)" } }
+        }
+      }
+    });
+  } catch (e) {
+    document.getElementById("village-sub").textContent =
+      "Backend not reachable — start the FastAPI server (see README).";
+    console.error(e);
+
+    // Randomized demo values keep the dashboard populated while FastAPI is offline.
+    const agricultureAcres = Math.floor(320 + Math.random() * 181);
+    const nonAgricultureAcres = Math.floor(110 + Math.random() * 131);
+    const flowingAcres = Math.floor(140 + Math.random() * 101);
+    const noFlowAcres = Math.floor(50 + Math.random() * 71);
+    const excessFlowAcres = Math.floor(8 + Math.random() * 28);
+    const totalAcres = agricultureAcres + nonAgricultureAcres;
+    const isHigh = agricultureAcres / totalAcres >= 0.60;
+
+    document.getElementById("village-sub").textContent =
+      `Demo Village · ${totalAcres} acres surveyed (random sample values)`;
+    document.getElementById("class-reason").textContent =
+      `${totalAcres} ac total · ${Math.floor(650 + Math.random() * 451)}mm/yr sample rainfall`;
+    document.getElementById("class-level").innerHTML =
+      `<span class="badge ${isHigh ? "high" : "moderate"}">${isHigh ? "High" : "Moderate"} Level Land</span>`;
+    document.getElementById("water-flow-acres").textContent = `${flowingAcres} ac`;
+    document.getElementById("water-noflow-acres").textContent = `${noFlowAcres} ac`;
+    document.getElementById("water-excess-acres").textContent = `${excessFlowAcres} ac`;
+    document.getElementById("agriculture-acres").textContent = `${agricultureAcres} ac`;
+    document.getElementById("non-agriculture-acres").textContent = `${nonAgricultureAcres} ac`;
+
+    new Chart(document.getElementById("landBarChart"), {
+      type: "bar",
+      data: {
+        labels: ["Agriculture", "Non-Agri"],
+        datasets: [{
+          data: [agricultureAcres, nonAgricultureAcres],
+          backgroundColor: ["rgba(143,208,160,0.8)", "rgba(159,150,120,0.8)"],
+          borderRadius: 8,
+          maxBarThickness: 50,
+        }]
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: "#c6cec2", font:{size:11} }, grid: { display: false } },
+          y: { ticks: { color: "#c6cec2", font:{size:10} }, grid: { color: "rgba(255,255,255,0.06)" } }
+        }
+      }
+    });
+  }
+}
+init();
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" integrity="sha512-puJW3E/qXDqYp9IfhAI54BJEaWIfloJ7JWs7OeD5i6ruC9JZL1gERT1wjtwXFlh7CjE7ZJ+/vcRZRkIYIb6p4g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script>
+  const mapExplorerMap = L.map("map-explorer-map").setView([20.5937, 78.9629], 5);
+  const locationStatus = document.getElementById("map-location-status");
+  let locationMarker;
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "&copy; OpenStreetMap contributors", maxZoom: 19 }).addTo(mapExplorerMap);
+  function updateCurrentLocation(position) {
+    const { latitude, longitude, accuracy } = position.coords;
+    const latLng = [latitude, longitude];
+    if (locationMarker) locationMarker.setLatLng(latLng);
+    else locationMarker = L.marker(latLng).addTo(mapExplorerMap).bindPopup("Your current location");
+    mapExplorerMap.setView(latLng, 15);
+    locationStatus.textContent = `Current location: ${latitude.toFixed(4)}, ${longitude.toFixed(4)} (±${Math.round(accuracy)} m)`;
+  }
+  if (navigator.geolocation) navigator.geolocation.watchPosition(updateCurrentLocation, () => { locationStatus.textContent = "Location access was denied or is unavailable."; }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+  else locationStatus.textContent = "Geolocation is not supported by this browser.";
+</script>
+</body>
+</html>

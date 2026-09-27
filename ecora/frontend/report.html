@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ecora · Reports</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div id="app"></div>
+
+<script src="assets/app.js"></script>
+<script>
+function init() {
+  mountShell("report.html", `
+    <div class="topbar">
+      <div>
+        <div class="page-title">File a Report</div>
+        <div class="page-sub">Photo is mandatory · location is auto-tagged</div>
+      </div>
+    </div>
+
+    <form id="report-form" style="max-width:900px;">
+      <div class="card report-box report-title-box">
+        <input type="text" id="title" placeholder="Title" required>
+      </div>
+
+      <div class="card report-box report-body-box" style="margin-top:16px;">
+        <textarea id="description" placeholder="Report and complaint" required></textarea>
+      </div>
+
+      <div class="image-slots">
+        <div class="image-slot" id="slot-1">
+          <span>🖼</span><span>Images <span class="required">*</span></span>
+        </div>
+        <div class="image-slot" id="slot-2">
+          <span>🖼</span><span>Images (optional)</span>
+        </div>
+      </div>
+      <input type="file" id="image-main" accept="image/*" style="display:none">
+      <input type="file" id="image-extra" accept="image/*" style="display:none">
+
+      <div class="card" style="margin-top:16px;">
+        <h3>Geolocation</h3>
+        <div class="field-row" style="margin-top:10px;">
+          <div class="field">
+            <label>Latitude</label>
+            <input type="number" step="any" id="lat" placeholder="12.9721" required>
+          </div>
+          <div class="field">
+            <label>Longitude</label>
+            <input type="number" step="any" id="lng" placeholder="77.5946" required>
+          </div>
+        </div>
+        <button type="button" class="pill-btn" id="geo-btn">📍 Use my current location</button>
+      </div>
+
+      <div class="submit-row">
+        <button type="submit" class="pill-btn accent">Submit Report</button>
+      </div>
+      <div class="form-msg" id="form-msg"></div>
+    </form>
+  `);
+
+  const slot1 = document.getElementById("slot-1");
+  const slot2 = document.getElementById("slot-2");
+  const fileMain = document.getElementById("image-main");
+  const fileExtra = document.getElementById("image-extra");
+
+  function wireSlot(slot, input) {
+    slot.onclick = () => input.click();
+    input.onchange = () => {
+      if (input.files.length) {
+        const url = URL.createObjectURL(input.files[0]);
+        slot.classList.add("has-file");
+        slot.innerHTML = `<img src="${url}"><span>${input.files[0].name}</span>`;
+      }
+    };
+  }
+  wireSlot(slot1, fileMain);
+  wireSlot(slot2, fileExtra);
+
+  document.getElementById("geo-btn").onclick = () => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(pos => {
+      document.getElementById("lat").value = pos.coords.latitude.toFixed(6);
+      document.getElementById("lng").value = pos.coords.longitude.toFixed(6);
+    }, () => {
+      const msg = document.getElementById("form-msg");
+      msg.textContent = "Could not fetch location — enter manually.";
+      msg.className = "form-msg err";
+    });
+  };
+
+  document.getElementById("report-form").onsubmit = async (e) => {
+    e.preventDefault();
+    const msg = document.getElementById("form-msg");
+    if (!fileMain.files.length) {
+      msg.textContent = "At least one photo is mandatory.";
+      msg.className = "form-msg err";
+      return;
+    }
+    const fd = new FormData();
+    fd.append("title", document.getElementById("title").value);
+    fd.append("description", document.getElementById("description").value);
+    fd.append("lat", document.getElementById("lat").value);
+    fd.append("lng", document.getElementById("lng").value);
+    fd.append("image", fileMain.files[0]);
+
+    try {
+      const res = await fetch(`${API_BASE}/api/reports`, { method: "POST", body: fd });
+      if (!res.ok) throw new Error(await res.text());
+      msg.textContent = "Report submitted successfully.";
+      msg.className = "form-msg ok";
+      e.target.reset();
+      [slot1, slot2].forEach((slot, i) => {
+        slot.classList.remove("has-file");
+        slot.innerHTML = `<span>🖼</span><span>Images ${i === 0 ? '<span class="required">*</span>' : '(optional)'}</span>`;
+      });
+    } catch (err) {
+      msg.textContent = "Submission failed — is the backend running?";
+      msg.className = "form-msg err";
+      console.error(err);
+    }
+  };
+}
+init();
+</script>
+</body>
+</html>

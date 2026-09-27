@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ecora · Water Shed</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" integrity="sha512-h9FcoyWjHcOcmEVkxOfTLnmZFWIH0iZhZT1H2TbOq55xssQGEJHEaIm+PgoUaZbRvQTNTluNOEfb1ZRy6D3BOw==" crossorigin="anonymous" referrerpolicy="no-referrer">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+</head>
+<body>
+<div id="app"></div>
+
+<script src="assets/app.js"></script>
+<script>
+async function init() {
+  mountShell("watershed.html", `
+    <div class="topbar">
+      <div>
+        <div class="page-title">Water Shed</div>
+        <div class="page-sub" id="village-sub">Loading watershed data…</div>
+      </div>
+      <span class="badge" id="status-badge">—</span>
+    </div>
+
+    <div class="map-page-layout">
+      <div class="card map-box-lg">
+        <h3>Water Bodies &amp; Flow Map</h3>
+        <div class="map-wrap" style="min-height:480px;">
+          <div id="watershed-flow-map" class="leaflet-map" aria-label="River flow map"></div>
+          <div class="flow-legend"><span class="flow-legend-line">➜</span> Downstream water flow</div>
+        </div>
+      </div>
+
+      <div class="side-stack">
+        <div class="card">
+          <h3>Rain Graph <span class="estimate-label">Estimated from flow</span></h3>
+          <div class="chart-box rain-chart-box" style="height:130px;">
+            <svg class="rain-fallback-graph" viewBox="0 0 360 130" preserveAspectRatio="none" aria-hidden="true">
+              <defs><linearGradient id="rainFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4da3df" stop-opacity=".42"/><stop offset="1" stop-color="#4da3df" stop-opacity=".03"/></linearGradient></defs>
+              <path class="rain-grid" d="M20 25H350M20 62H350M20 99H350"/>
+              <path d="M20 104 L20 83 L70 69 L118 76 L166 45 L214 58 L262 29 L310 52 L350 36 L350 104Z" fill="url(#rainFill)"/>
+              <path d="M20 83 L70 69 L118 76 L166 45 L214 58 L262 29 L310 52 L350 36" fill="none" stroke="#4da3df" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+              <g fill="#7fc4ee"><circle cx="20" cy="83" r="3"/><circle cx="70" cy="69" r="3"/><circle cx="118" cy="76" r="3"/><circle cx="166" cy="45" r="3"/><circle cx="214" cy="58" r="3"/><circle cx="262" cy="29" r="3"/><circle cx="310" cy="52" r="3"/><circle cx="350" cy="36" r="3"/></g>
+            </svg>
+            <canvas id="rainChart"></canvas>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>No. of Ponds &amp; Rivers</h3>
+          <div class="stat-row">
+            <div class="stat-chip"><div class="label">Ponds</div><div class="num" id="ponds-count">—</div></div>
+            <div class="stat-chip"><div class="label">Rivers</div><div class="num" id="rivers-count">—</div></div>
+          </div>
+          <div class="hint" style="margin-top:10px;">
+            Streams: <b id="streams-count">—</b> · Waterflow: <b id="waterflow-lps">—</b>
+          </div>
+          <div class="hint">Main body: <b id="main-body">—</b></div>
+        </div>
+
+        <div class="card">
+          <h3>Flood Area or Drought Area</h3>
+          <div class="value" id="status-value" style="font-size:20px;">—</div>
+          <div class="hint" style="margin-top:10px;line-height:1.7;">
+            &gt;80mm → <span class="badge flood">Flood</span> ·
+            &lt;30mm → <span class="badge drought">Drought</span> ·
+            else <span class="badge normal">Normal</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>cm of Rain</h3>
+          <div class="value" id="rain-cm">—</div>
+          <div class="hint">Month total: <span id="rain-cm-month">—</span> cm</div>
+        </div>
+      </div>
+    </div>
+  `);
+
+  try {
+    const d = await apiGet("/api/watershed");
+    document.getElementById("village-sub").textContent = `${d.village} · watershed monitoring`;
+
+    const badge = document.getElementById("status-badge");
+    const statusClass = d.status.toLowerCase().includes("flood") ? "flood"
+      : d.status.toLowerCase().includes("drought") ? "drought" : "normal";
+    badge.textContent = d.status;
+    badge.className = `badge ${statusClass}`;
+    document.getElementById("status-value").innerHTML = `<span class="badge ${statusClass}">${d.status}</span>`;
+
+    document.getElementById("ponds-count").textContent = d.water_body_stats.ponds_count;
+    document.getElementById("rivers-count").textContent = d.water_body_stats.rivers_count;
+    document.getElementById("streams-count").textContent = d.water_body_stats.streams_count;
+    document.getElementById("waterflow-lps").textContent = `${d.water_body_stats.total_waterflow_lps} L/s`;
+    document.getElementById("main-body").textContent = d.water_body_stats.main_water_body;
+
+    document.getElementById("rain-cm").textContent = `${d.rainfall_cm_today} cm`;
+    document.getElementById("rain-cm-month").textContent = d.rainfall_cm_month_total;
+
+    const labels = d.rain_series.map(s => s.date.slice(5));
+    const values = d.rain_series.map(s => s.rainfall_mm);
+    new Chart(document.getElementById("rainChart"), {
+      type: "line",
+      data: {
+        labels,
+        datasets: [{
+          data: values,
+          borderColor: "#7fb8d9",
+          backgroundColor: "rgba(127,184,217,0.18)",
+          fill: true,
+          tension: 0.35,
+          pointRadius: 2,
+        }]
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: "#c6cec2", font:{size:9} }, grid: { display: false } },
+          y: { ticks: { color: "#c6cec2", font:{size:9} }, grid: { color: "rgba(255,255,255,0.06)" } }
+        }
+      }
+    });
+  } catch (e) {
+    document.getElementById("village-sub").textContent =
+      "Backend not reachable — start the FastAPI server (see README).";
+    console.error(e);
+
+    // Keep the dashboard usable without the FastAPI service by showing
+    // clearly labelled sample values that match the displayed flow route.
+    const dummyRainSeries = Array.from({ length: 14 }, (_, index) => ({
+      date: `2026-09-${String(index + 1).padStart(2, "0")}`,
+      rainfall_mm: Math.floor(30 + Math.random() * 41),
+    }));
+    const dummyTodayMm = dummyRainSeries.at(-1).rainfall_mm;
+    const dummyMonthTotalMm = dummyRainSeries.reduce((total, item) => total + item.rainfall_mm, 0);
+    document.getElementById("village-sub").textContent =
+      "Demo Watershed · sample values (backend offline)";
+    const badge = document.getElementById("status-badge");
+    badge.textContent = "Normal";
+    badge.className = "badge normal";
+    document.getElementById("status-value").innerHTML = '<span class="badge normal">Normal</span>';
+    document.getElementById("ponds-count").textContent = "2";
+    document.getElementById("rivers-count").textContent = "1";
+    document.getElementById("streams-count").textContent = "1";
+    document.getElementById("waterflow-lps").textContent = "1,840 L/s";
+    document.getElementById("main-body").textContent = "Demo Feeder Channel";
+    document.getElementById("rain-cm").textContent = `${(dummyTodayMm / 10).toFixed(1)} cm`;
+    document.getElementById("rain-cm-month").textContent = (dummyMonthTotalMm / 10).toFixed(1);
+
+    new Chart(document.getElementById("rainChart"), {
+      type: "line",
+      data: {
+        labels: dummyRainSeries.map(item => item.date.slice(5)),
+        datasets: [{
+          data: dummyRainSeries.map(item => item.rainfall_mm),
+          borderColor: "#7fb8d9",
+          backgroundColor: "rgba(127,184,217,0.18)",
+          fill: true,
+          tension: 0.35,
+          pointRadius: 2,
+        }]
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: "#c6cec2", font:{size:9} }, grid: { display: false } },
+          y: { ticks: { color: "#c6cec2", font:{size:9} }, grid: { color: "rgba(255,255,255,0.06)" } }
+        }
+      }
+    });
+  }
+}
+init();
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" integrity="sha512-puJW3E/qXDqYp9IfhAI54BJEaWIfloJ7JWs7OeD5i6ruC9JZL1gERT1wjtwXFlh7CjE7ZJ+/vcRZRkIYIb6p4g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script>
+  const watershedFlowMap = L.map("watershed-flow-map").setView([15.8167, 74.8667], 13);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "&copy; OpenStreetMap contributors", maxZoom: 19 }).addTo(watershedFlowMap);
+  // Flow-only layer: arrows point downstream; water-body polygons are omitted.
+  const downstreamPath = [[15.8300, 74.8400], [15.8200, 74.8550], [15.8100, 74.8700], [15.8000, 74.8900]];
+  L.polyline(downstreamPath, { color: "#0369a1", weight: 5, opacity: 0.9, lineCap: "round" }).addTo(watershedFlowMap);
+  const flowArrow = L.divIcon({ className: "flow-arrow-icon", html: '<span class="flow-arrow">➜</span>', iconSize: [24, 24], iconAnchor: [12, 12] });
+  [[15.8225, 74.8512], [15.8125, 74.8662], [15.8025, 74.8850]].forEach(point => L.marker(point, { icon: flowArrow, interactive: false }).addTo(watershedFlowMap));
+</script>
+</body>
+</html>

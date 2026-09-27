@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ecora · Reporting Assistant</title>
+<link rel="stylesheet" href="assets/style.css">
+<style>
+  .chatbot-page{max-width:860px;margin:0 auto;}
+  .chat-container{overflow:hidden;border:1px solid var(--glass-border);border-radius:var(--radius);background:rgba(17,22,17,.58);box-shadow:var(--shadow);}
+  .chat-header{display:flex;align-items:center;gap:12px;padding:18px 22px;background:rgba(127,196,122,.18);border-bottom:1px solid var(--glass-border);}
+  .chat-icon,.chat-avatar{display:grid;place-items:center;flex:0 0 auto;border-radius:10px;}
+  .chat-icon{width:42px;height:42px;background:var(--accent-strong);color:#122015;font-size:20px;}
+  .chat-header h1{margin:0;font:600 18px "Helvetica Neue",Helvetica,Arial,sans-serif;color:var(--ink-0);}
+  .chat-header p{margin:3px 0 0;color:var(--ink-2);font-size:12px;}
+  .chat-window{display:flex;flex-direction:column;gap:16px;min-height:390px;max-height:520px;overflow-y:auto;padding:22px;background:rgba(0,0,0,.13);scroll-behavior:smooth;}
+  .chat-message{display:flex;gap:10px;max-width:90%;animation:chat-in .2s ease;}
+  .chat-message.user{align-self:flex-end;flex-direction:row-reverse;}
+  .chat-avatar{width:34px;height:34px;background:var(--accent-soft);color:var(--accent);font-size:16px;}
+  .chat-message.user .chat-avatar{background:var(--accent-strong);color:#122015;}
+  .chat-bubble{padding:11px 15px;border:1px solid var(--glass-border);border-radius:16px;border-bottom-left-radius:5px;background:var(--glass);color:var(--ink-1);font-size:13px;line-height:1.55;word-break:break-word;}
+  .chat-message.user .chat-bubble{border:0;border-bottom-left-radius:16px;border-bottom-right-radius:5px;background:var(--accent-strong);color:#122015;}
+  .chat-options{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
+  .chat-option,.chat-send{font:600 13px 'Poppins',sans-serif;cursor:pointer;transition:.15s;}
+  .chat-option{padding:7px 13px;border:1px solid var(--accent-strong);border-radius:999px;background:transparent;color:var(--accent);}
+  .chat-option:hover,.chat-option.primary{background:var(--accent-strong);color:#122015;}
+  .chat-option:disabled{opacity:.55;cursor:default;}
+  .chat-input{display:flex;gap:10px;padding:15px 18px;border-top:1px solid var(--glass-border);background:rgba(0,0,0,.12);}
+  .chat-input input{flex:1;min-width:0;padding:11px 15px;border:1px solid var(--glass-border);border-radius:999px;outline:0;background:rgba(255,255,255,.05);color:var(--ink-0);font:13px 'Poppins',sans-serif;}
+  .chat-input input:focus{border-color:var(--accent-strong);}
+  .chat-input input::placeholder{color:var(--ink-2);}
+  .chat-send{padding:0 21px;border:0;border-radius:999px;background:var(--accent-strong);color:#122015;}
+  .chat-send:hover{background:var(--accent);}
+  .chat-disclaimer{margin:0;padding:9px 18px 14px;text-align:center;color:var(--ink-2);font-size:10.5px;background:rgba(0,0,0,.12);}
+  .chat-summary{padding:10px 12px;border-left:3px solid var(--accent-strong);border-radius:7px;background:var(--accent-soft);font-size:12px;}
+  @keyframes chat-in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script src="assets/app.js"></script>
+<script>
+function init() {
+  mountShell("chatbot.html", `
+    <div class="chatbot-page">
+      <div class="topbar"><div><div class="page-title">Reporting Assistant</div><div class="page-sub">GUIDED FLOOD & DROUGHT REPORTING</div></div></div>
+      <section class="chat-container" aria-label="Watershed management assistant">
+        <header class="chat-header"><div class="chat-icon">💧</div><div><h1>Watershed management assistant</h1><p>Official reporting · Flood & drought</p></div></header>
+        <div class="chat-window" id="chatWindow" aria-live="polite"></div>
+        <div class="chat-input"><input id="userInput" type="text" placeholder="Type your reply..." autocomplete="off"><button class="chat-send" id="sendBtn">Send</button></div>
+        <p class="chat-disclaimer">⚠ This assistant does not predict floods or droughts. It only helps you report and submit information.</p>
+      </section>
+    </div>`);
+
+  const chatWindow = document.getElementById("chatWindow");
+  const userInput = document.getElementById("userInput");
+  const sendBtn = document.getElementById("sendBtn");
+  let state = { currentStep: "welcome", reportType: null, formData: {} };
+
+  function addMessage(text, sender = "bot", html = false) {
+    const message = document.createElement("div");
+    message.className = `chat-message ${sender}`;
+    const avatar = document.createElement("div");
+    avatar.className = "chat-avatar";
+    avatar.textContent = sender === "bot" ? "🌿" : "👤";
+    const bubble = document.createElement("div");
+    bubble.className = "chat-bubble";
+    if (html) bubble.innerHTML = text; else bubble.textContent = text;
+    message.append(avatar, bubble); chatWindow.appendChild(message);
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+    return bubble;
+  }
+  function addOptions(text, options, callback) {
+    const bubble = addMessage(text);
+    const group = document.createElement("div"); group.className = "chat-options";
+    options.forEach(option => {
+      const button = document.createElement("button");
+      button.className = `chat-option${option.primary ? " primary" : ""}`;
+      button.textContent = option.label;
+      button.onclick = () => { group.querySelectorAll("button").forEach(item => item.disabled = true); callback(option.value, option.label); };
+      group.appendChild(button);
+    });
+    bubble.appendChild(group); chatWindow.scrollTop = chatWindow.scrollHeight;
+  }
+  function skipOr(value) { return value.toLowerCase() === "skip" ? "Not provided" : value; }
+  function chooseSeverity(nextStep, question, key) {
+    addOptions("Select the severity level:", ["Low", "Medium", "High"].map(value => ({ label:value, value })), value => {
+      addMessage(value, "user"); state.formData.severity = value; state.currentStep = nextStep; addMessage(question);
+    });
+  }
+  function startFlood() { state = { currentStep:"flood_location", reportType:"flood", formData:{} }; addMessage("Flood report — please provide the location or village name."); }
+  function startDrought() { state = { currentStep:"drought_location", reportType:"drought", formData:{} }; addMessage("Drought report — please provide the location or village name."); }
+  function welcome() {
+    state.currentStep = "welcome";
+    addMessage("Watershed management assistant — I help you report flood or drought situations. I do not make predictions.");
+    addOptions("Please choose an option:", [{label:"🌊 Report a flood",value:"flood",primary:true},{label:"🌵 Report a drought",value:"drought"}], value => { addMessage(value === "flood" ? "🌊 Report a flood" : "🌵 Report a drought", "user"); value === "flood" ? startFlood() : startDrought(); });
+  }
+  function finish() {
+    const data = state.formData, flood = state.reportType === "flood";
+    const details = flood ? [["Location",data.location],["Date & time",data.datetime],["Severity",data.severity],["Water level / area",data.waterLevel],["Affected people",data.affected],["Damage",data.damage],["Remarks",data.remarks]] : [["Location",data.location],["Date",data.date],["Severity",data.severity],["Water availability",data.waterAvailability],["Remarks",data.remarks]];
+    addMessage(`<div class="chat-summary"><strong>✓ ${flood ? "Flood" : "Drought"} report summary</strong><br><br>${details.map(([label,value]) => `<strong>${label}:</strong> ${value || "—"}`).join("<br>")}</div>`, "bot", true);
+    addMessage("Your report has been recorded. Thank you. You can now submit another report.");
+    state = { currentStep:"welcome", reportType:null, formData:{} }; welcome();
+  }
+  function handleReply(reply) {
+    const answer = reply.trim(); if (!answer) return; addMessage(answer, "user");
+    switch (state.currentStep) {
+      case "welcome": if (/^(flood|report flood)$/i.test(answer)) startFlood(); else if (/^(drought|report drought)$/i.test(answer)) startDrought(); else addMessage("Please choose an option above, or type flood or drought."); break;
+      case "flood_location": state.formData.location=answer; state.currentStep="flood_datetime"; addMessage("Please provide the date and time of the flood event (for example, 2025-04-10 14:30)."); break;
+      case "flood_datetime": state.formData.datetime=answer; chooseSeverity("flood_waterlevel", "Please provide the water level or approximate flooding area, if known. Type skip if unknown."); break;
+      case "flood_waterlevel": state.formData.waterLevel=skipOr(answer); state.currentStep="flood_affected"; addMessage("Number of affected people, if known. Type skip if unknown."); break;
+      case "flood_affected": state.formData.affected=skipOr(answer); state.currentStep="flood_damage"; addMessage("Any road, bridge, crop, house, or infrastructure damage? Describe briefly, or type skip."); break;
+      case "flood_damage": state.formData.damage=skipOr(answer); state.currentStep="flood_remarks"; addMessage("Any additional remarks? Type skip if none."); break;
+      case "flood_remarks": state.formData.remarks=skipOr(answer); finish(); break;
+      case "drought_location": state.formData.location=answer; state.currentStep="drought_date"; addMessage("Please provide the date of the drought condition (for example, 2025-07-15)."); break;
+      case "drought_date": state.formData.date=answer; chooseSeverity("drought_water", "Describe water availability, such as wells dry, reservoir low, or drinking-water shortage."); break;
+      case "drought_water": state.formData.waterAvailability=answer; state.currentStep="drought_remarks"; addMessage("Any additional remarks? Type skip if none."); break;
+      case "drought_remarks": state.formData.remarks=skipOr(answer); finish(); break;
+    }
+  }
+  sendBtn.onclick = () => { const answer=userInput.value; userInput.value=""; handleReply(answer); };
+  userInput.onkeydown = event => { if (event.key === "Enter") { event.preventDefault(); sendBtn.click(); } };
+  welcome();
+}
+init();
+</script>
+</body>
+</html>

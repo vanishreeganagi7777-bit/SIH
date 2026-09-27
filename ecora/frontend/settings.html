@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ecora · Settings</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div id="app"></div>
+
+<script src="assets/app.js"></script>
+<script>
+function toggleSwitch(el) {
+  el.classList.toggle("on");
+}
+
+function init() {
+  mountShell("settings.html", `
+    <div class="topbar">
+      <div>
+        <div class="page-title">Settings</div>
+        <div class="page-sub">App preferences (dummy — not yet persisted)</div>
+      </div>
+    </div>
+
+    <div class="settings-list">
+      <div class="settings-row">
+        <div>
+          <div class="label">Flood / drought alerts</div>
+          <div class="sub">Notify when rainfall crosses 80mm or drops below 30mm</div>
+        </div>
+        <div class="switch on" onclick="toggleSwitch(this)"><div class="knob"></div></div>
+      </div>
+
+      <div class="settings-row">
+        <div>
+          <div class="label">Auto geo-tag reports</div>
+          <div class="sub">Use device location when filing a new report</div>
+        </div>
+        <div class="switch on" onclick="toggleSwitch(this)"><div class="knob"></div></div>
+      </div>
+
+      <div class="settings-row">
+        <div>
+          <div class="label">Kannada language UI</div>
+          <div class="sub">Switch dashboard labels to Kannada</div>
+        </div>
+        <div class="switch" onclick="toggleSwitch(this)"><div class="knob"></div></div>
+      </div>
+
+      <div class="settings-row">
+        <div>
+          <div class="label">Dark theme</div>
+          <div class="sub">Ecora currently ships dark-only</div>
+        </div>
+        <div class="switch on" style="opacity:.5;pointer-events:none;"><div class="knob"></div></div>
+      </div>
+
+      <div class="settings-row">
+        <div>
+          <div class="label">API endpoint</div>
+          <div class="sub" id="api-endpoint-label">http://127.0.0.1:8000</div>
+        </div>
+        <button class="pill-btn">Edit</button>
+      </div>
+    </div>
+  `);
+}
+init();
+</script>
+</body>
+</html>
